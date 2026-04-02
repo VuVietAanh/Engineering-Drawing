@@ -6,9 +6,19 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
+# Bước 1 — Cài torch CPU trước
+RUN pip install --no-cache-dir \
+    torch==2.3.0+cpu \
+    torchvision==0.18.0+cpu \
+    --extra-index-url https://download.pytorch.org/whl/cpu
+
+# Bước 2 — Cài detectron2 (cần torch có sẵn)
+RUN pip install --no-cache-dir \
+    'git+https://github.com/facebookresearch/detectron2.git'
+
+# Bước 3 — Cài các thư viện còn lại
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN python -m pip install 'git+https://github.com/facebookresearch/detectron2.git'
 
 COPY . .
 

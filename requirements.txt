@@ -5,7 +5,3 @@ easyocr==1.7.1
 opencv-python-headless==4.9.0.80
 reportlab==4.1.0
 huggingface-hub==0.23.0
-torch==2.3.0+cpu
-torchvision==0.18.0+cpu
-detectron2 @ git+https://github.com/facebookresearch/detectron2.git
---extra-index-url https://download.pytorch.org/whl/cpu
