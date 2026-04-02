@@ -92,20 +92,49 @@ def detect_cells(binary):
     rows.append(sorted(cur, key=lambda c:c[0]))
     return rows
 
-def ocr_table(binary, rows, reader):
-    ih, iw = binary.shape
-    data   = []
-    for row in rows:
-        row_text = []
-        for (x1,y1,x2,y2) in row:
-            cell = binary[max(0,y1+4):min(ih,y2-4),
-                          max(0,x1+4):min(iw,x2-4)]
-            text = " ".join(t for (_,t,c)
-                            in reader.readtext(cell, detail=1) if c>0.3)
-            row_text.append(text.strip())
-        if any(t for t in row_text):
-            data.append(row_text)
-    return data
+def extract_table_img2table(crop_img, reader):
+    """Dùng img2table detect cấu trúc + OCR từng cell."""
+    import tempfile
+
+    from img2table.document import Image as Img2TableImage
+    from img2table.ocr import EasyOCR as Img2TableEasyOCR
+
+    try:
+        # Lưu crop ra file tạm
+        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        cv2.imwrite(tmp.name, crop_img)
+        tmp.close()
+
+        ocr_engine = Img2TableEasyOCR(reader=reader)
+        doc        = Img2TableImage(src=tmp.name)
+        tables     = doc.extract_tables(
+            ocr=ocr_engine,
+            implicit_rows=True,
+            implicit_columns=False,
+            borderless_tables=False,
+            min_confidence=40,
+        )
+        os.unlink(tmp.name)
+
+        if not tables:
+            return None
+
+        # Lấy bảng lớn nhất
+        best = max(tables, key=lambda t: t.df.shape[0] * t.df.shape[1])
+        df   = best.df
+
+        rows = []
+        # Header
+        if list(df.columns) != list(range(len(df.columns))):
+            rows.append([str(c) for c in df.columns])
+        # Data
+        for _, row in df.iterrows():
+            rows.append([str(v) if v is not None else "" for v in row])
+        return rows
+
+    except Exception as e:
+        print(f"img2table error: {e}")
+        return None
 
 def save_table_pdf(table_data, out_path, title="Table"):
     if not table_data:
@@ -155,7 +184,8 @@ def run_inference(image_bytes: bytes, predictor, reader,
     # Visualize
     try:
         meta = MetadataCatalog.get("drawing_demo")
-    except:
+        meta.thing_classes = CLASS_NAMES  # ← luôn set lại
+    except Exception:
         DatasetCatalog.register("drawing_demo", lambda: [])
         meta = MetadataCatalog.get("drawing_demo")
         meta.thing_classes = CLASS_NAMES
@@ -195,20 +225,25 @@ def run_inference(image_bytes: bytes, predictor, reader,
 
         elif cls == "Table":
             cv2.imwrite(f"{output_dir}/Table/table{idx}.png", crop)
-            proc  = preprocess_table(crop)
-            rows  = detect_cells(proc)
-            if rows:
-                table_data = ocr_table(proc, rows, reader)
-            else:
-                res        = sorted(reader.readtext(proc, detail=1),
-                                    key=lambda r: r[0][0][1])
-                table_data = [[t] for (_,t,c) in res if c > 0.3]
-            ocr_content = "\n".join(
-                " | ".join(r) for r in table_data)
-            save_table_pdf(
-                table_data,
-                f"{output_dir}/Table/extract_table{idx}.pdf",
-                title=f"Table {idx}")
+            proc = preprocess_table(crop)
+
+            # Thử img2table trước
+            table_data = extract_table_img2table(crop, reader)
+
+            # Fallback morphology nếu img2table thất bại
+            if not table_data or len(table_data) < 2:
+                rows = detect_cells(proc)
+                if rows:
+                    table_data = ocr_table(proc, rows, reader)
+                else:
+                    res        = sorted(reader.readtext(proc, detail=1),
+                                        key=lambda r: r[0][0][1])
+                    table_data = [[t] for (_,t,c) in res if c > 0.3]
+
+            ocr_content = "\n".join(" | ".join(r) for r in table_data)
+            save_table_pdf(table_data,
+                        f"{output_dir}/Table/extract_table{idx}.pdf",
+                        title=f"Table {idx}")
 
         json_result["objects"].append({
             "id":          i + 1,
