@@ -92,6 +92,21 @@ def detect_cells(binary):
     rows.append(sorted(cur, key=lambda c:c[0]))
     return rows
 
+def ocr_table(binary, rows, reader):
+    ih, iw = binary.shape
+    data   = []
+    for row in rows:
+        row_text = []
+        for (x1,y1,x2,y2) in row:
+            cell = binary[max(0,y1+4):min(ih,y2-4),
+                          max(0,x1+4):min(iw,x2-4)]
+            text = " ".join(t for (_,t,c)
+                            in reader.readtext(cell, detail=1) if c>0.3)
+            row_text.append(text.strip())
+        if any(t for t in row_text):
+            data.append(row_text)
+    return data
+
 def extract_table_img2table(crop_img, reader):
     """Dùng img2table detect cấu trúc + OCR từng cell."""
     import tempfile
