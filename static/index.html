@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Engineering Drawing Analyzer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f0f2f5; color: #333; }
+  .header { background: #1F4E79; color: white; padding: 16px 32px; }
+  .header h1 { font-size: 22px; }
+  .header p  { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+  .container { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+  .card { background: white; border-radius: 10px; padding: 24px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px; }
+  .upload-zone { border: 2px dashed #1F4E79; border-radius: 8px;
+                 padding: 40px; text-align: center; cursor: pointer;
+                 transition: background 0.2s; }
+  .upload-zone:hover { background: #EBF3FB; }
+  .upload-zone input { display: none; }
+  .upload-zone p { color: #666; margin-top: 8px; font-size: 14px; }
+  .btn { background: #1F4E79; color: white; border: none; padding: 12px 28px;
+         border-radius: 6px; cursor: pointer; font-size: 15px;
+         margin-top: 12px; width: 100%; }
+  .btn:hover { background: #2E6DA4; }
+  .btn:disabled { background: #aaa; cursor: not-allowed; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  @media(max-width:768px) { .grid,.grid-3 { grid-template-columns: 1fr; } }
+  h3 { font-size: 15px; color: #1F4E79; margin-bottom: 12px;
+       padding-bottom: 6px; border-bottom: 2px solid #EBF3FB; }
+  #vis-img { width: 100%; border-radius: 6px; border: 1px solid #ddd; }
+  pre { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px;
+        padding: 12px; font-size: 12px; overflow: auto; max-height: 400px;
+        white-space: pre-wrap; }
+  .ocr-box { background: #f8f9fa; border-left: 3px solid #1F4E79;
+             padding: 10px 14px; border-radius: 0 6px 6px 0;
+             margin-bottom: 10px; font-size: 13px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px;
+           font-size: 11px; font-weight: bold; margin-right: 6px; }
+  .badge-note  { background: #FFF3CD; color: #856404; }
+  .badge-table { background: #D1ECF1; color: #0C5460; }
+  .badge-part  { background: #D4EDDA; color: #155724; }
+  .spinner { display: none; text-align: center; padding: 20px; color: #666; }
+  .download-btn { background: #28a745; color: white; border: none;
+                  padding: 10px 20px; border-radius: 6px; cursor: pointer;
+                  font-size: 14px; margin-top: 10px; }
+  .download-btn:hover { background: #218838; }
+  #preview-img { max-width: 100%; max-height: 200px; border-radius: 6px;
+                 margin-top: 10px; display: none; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Engineering Drawing Analyzer</h1>
+  <p>Object Detection & OCR System — PartDrawing / Note / Table</p>
+</div>
+
+<div class="container">
+
+  <!-- Upload -->
+  <div class="card">
+    <h3>Upload Zone</h3>
+    <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+           stroke="#1F4E79" stroke-width="1.5">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <p>Click để chọn ảnh bản vẽ kỹ thuật</p>
+      <p style="font-size:12px;color:#aaa">Hỗ trợ: JPG, PNG</p>
+      <input type="file" id="file-input" accept="image/*" onchange="previewFile(this)">
+    </div>
+    <img id="preview-img" alt="preview">
+    <button class="btn" id="detect-btn" onclick="detect()" disabled>
+      Detect & Analyze
+    </button>
+  </div>
+
+  <!-- Spinner -->
+  <div class="spinner" id="spinner">
+    ⏳ Đang xử lý... (detection + OCR có thể mất 30-60 giây)
+  </div>
+
+  <!-- Results -->
+  <div id="results" class="hidden">
+    <div class="grid">
+      <!-- Visualization -->
+      <div class="card">
+        <h3>Visualization — Bounding Boxes</h3>
+        <img id="vis-img" alt="result">
+      </div>
+      <!-- JSON -->
+      <div class="card">
+        <h3>JSON Output</h3>
+        <pre id="json-panel"></pre>
+      </div>
+    </div>
+
+    <!-- OCR -->
+    <div class="card">
+      <h3>OCR Panel — Note & Table Content</h3>
+      <div id="ocr-panel"></div>
+    </div>
+
+    <!-- Download -->
+    <div class="card">
+      <h3>Download Results</h3>
+      <p style="font-size:13px;color:#666">
+        Tải về toàn bộ file output (crops, JSON, PDF, TXT)
+      </p>
+      <button class="download-btn" id="dl-btn" onclick="download()">
+        ⬇ Download ZIP
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let currentSession = null;
+
+function previewFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('preview-img').src = e.target.result;
+    document.getElementById('preview-img').style.display = 'block';
+    document.getElementById('detect-btn').disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function detect() {
+  const file = document.getElementById('file-input').files[0];
+  if (!file) return;
+
+  document.getElementById('detect-btn').disabled = true;
+  document.getElementById('spinner').style.display = 'block';
+  document.getElementById('results').classList.add('hidden');
+
+  const form = new FormData();
+  form.append('file', file);
+
+  try {
+    const res  = await fetch('/detect', { method: 'POST', body: form });
+    const data = await res.json();
+    currentSession = data.session_id;
+    renderResults(data);
+  } catch(e) {
+    alert('Lỗi: ' + e.message);
+  } finally {
+    document.getElementById('detect-btn').disabled = false;
+    document.getElementById('spinner').style.display = 'none';
+  }
+}
+
+function renderResults(data) {
+  // Visualization
+  document.getElementById('vis-img').src = 'data:image/jpeg;base64,' + data.vis_image;
+
+  // JSON panel
+  document.getElementById('json-panel').textContent =
+    JSON.stringify(data.result, null, 2);
+
+  // OCR panel
+  const ocrPanel = document.getElementById('ocr-panel');
+  ocrPanel.innerHTML = '';
+  const objects = data.result.objects || [];
+  const ocrObjects = objects.filter(o => o.ocr_content);
+
+  if (ocrObjects.length === 0) {
+    ocrPanel.innerHTML = '<p style="color:#aaa;font-size:13px">Không có vùng Note/Table nào được detect.</p>';
+  } else {
+    ocrObjects.forEach(obj => {
+      const badgeClass = obj.class === 'Note' ? 'badge-note' :
+                         obj.class === 'Table' ? 'badge-table' : 'badge-part';
+      ocrPanel.innerHTML += `
+        <div class="ocr-box">
+          <span class="badge ${badgeClass}">${obj.class} #${obj.id}</span>
+          <span style="font-size:11px;color:#888">conf: ${obj.confidence}</span>
+          <pre style="margin-top:8px;background:white;border:none;padding:0">
+${obj.ocr_content || '(trống)'}</pre>
+        </div>`;
+    });
+  }
+
+  document.getElementById('results').classList.remove('hidden');
+}
+
+function download() {
+  if (currentSession)
+    window.location.href = `/download/${currentSession}`;
+}
+</script>
+</body>
+</html>
