@@ -63,9 +63,10 @@ python convert_labelme_to_coco.py \
 
 Cấu trúc thư mục sau khi chuẩn bị:
 ```
+Dữ liệu được upload lên Google Drive
 data/
-├── images/                  # 58 ảnh bản vẽ kỹ thuật
-└── annotations/ <Code tự sinh ra folder>
+├── images/                # 58 ảnh bản vẽ kỹ thuật và file .json chứa thông tin gắn nhãn của sản phẩm
+└── annotations/ <Code sẽ tự sinh ra folder>
     ├── annotations_train.json
     └── annotations_val.json
 ```
@@ -73,15 +74,8 @@ data/
 ### Chạy train (khuyến nghị Google Colab T4 GPU)
 
 ```python
-# Mở file train.ipynb trên Google Colab
-
-python train.py \
-    --train_json data/annotations/annotations_train.json \
-    --val_json   data/annotations/annotations_val.json \
-    --image_dir  data/images \
-    --output_dir weights/ \
-    --max_iter   8000
-```
+# Mở file engineering_drawing.ipynb trên Google Colab
+`` Kết nối với T4 GPU và kết nối Google Drive
 
 **Config train tốt nhất (v7):**
 
