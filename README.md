@@ -75,8 +75,6 @@ data/
 
 ```python
 # Mở file engineering_drawing.ipynb trên Google Colab
-
-
 **Config train tốt nhất (v7):**
 
 ```python
