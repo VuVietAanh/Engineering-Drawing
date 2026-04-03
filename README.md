@@ -277,3 +277,4 @@ engineering-drawing-demo/
 
 - **Web Demo:** https://asuranosuke-engineering-drawing-demo.hf.space
 - **Model:** https://huggingface.co/Asuranosuke/Detect-Info
+- **Email:** vanhvu1903vn@gmail.com
