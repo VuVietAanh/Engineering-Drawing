@@ -71,11 +71,11 @@ data/
     └── annotations_val.json
 ```
 
-### Chạy train (khuyến nghị Google Colab T4 GPU)
+### Chạy train (khuyến nghị Google Colab T4 GPU): Kết nối với T4 GPU và kết nối Google Drive
 
 ```python
 # Mở file engineering_drawing.ipynb trên Google Colab
-`` Kết nối với T4 GPU và kết nối Google Drive
+
 
 **Config train tốt nhất (v7):**
 
